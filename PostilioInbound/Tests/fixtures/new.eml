@@ -1,0 +1,21 @@
+Return-Path: <marie@example.org>
+From: Marie Curie <marie@example.org>
+To: Northwind support <support@inbound.northwind.test>
+Subject: The parcel arrived damaged
+Date: Wed, 21 Oct 2026 15:52:41 +0200
+Message-ID: <CAF4x9-new@mail.example.org>
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="b1"
+
+--b1
+Content-Type: text/plain; charset=utf-8
+
+Hi, the parcel arrived damaged.
+--b1
+Content-Type: image/jpeg; name="photo.jpg"
+Content-Disposition: attachment; filename="photo.jpg"
+Content-Transfer-Encoding: base64
+
+SlBFR0RBVEE=
+--b1--
+

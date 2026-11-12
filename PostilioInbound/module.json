@@ -1,0 +1,22 @@
+{
+    "name": "Postilio Dispatch - Inbound",
+    "alias": "postilioinbound",
+    "description": "Receive mail through Postilio inbound: its webhook creates conversations and replies, as fetched by IMAP.",
+    "version": "0.1.0",
+    "detailsUrl": "https://github.com/Postilio/postilio-freescout",
+    "author": "Postilio",
+    "authorUrl": "https://postilio.eu",
+    "requiredAppVersion": "1.8.0",
+    "license": "MIT",
+    "keywords": ["postilio", "email", "inbound", "webhook"],
+    "active": 0,
+    "order": 0,
+    "providers": [
+        "Modules\\PostilioInbound\\Providers\\PostilioInboundServiceProvider"
+    ],
+    "aliases": {},
+    "files": [
+        "start.php"
+    ],
+    "requires": []
+}
