@@ -1,0 +1,1 @@
+<li @if (Route::currentRouteName() == "postiliosend.settings")class="active"@endif><a href="{{ route("postiliosend.settings", ["mailbox_id" => $mailbox->id]) }}"><i class="glyphicon glyphicon-send"></i> {{ __("Postilio sending") }}</a></li>

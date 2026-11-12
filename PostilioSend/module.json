@@ -1,0 +1,22 @@
+{
+    "name": "PostilioSend",
+    "alias": "postiliosend",
+    "description": "Send replies through the Postilio API, per mailbox, and show when a reply bounced.",
+    "version": "0.1.0",
+    "detailsUrl": "https://github.com/Postilio/postilio-freescout",
+    "author": "Postilio",
+    "authorUrl": "https://postilio.eu",
+    "requiredAppVersion": "1.8.0",
+    "license": "MIT",
+    "keywords": ["postilio", "email", "sending", "bounces"],
+    "active": 0,
+    "order": 0,
+    "providers": [
+        "Modules\\PostilioSend\\Providers\\PostilioSendServiceProvider"
+    ],
+    "aliases": {},
+    "files": [
+        "start.php"
+    ],
+    "requires": []
+}
