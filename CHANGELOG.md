@@ -6,6 +6,16 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.1]
+
+### Fixed
+
+- Postilio Dispatch - Inbound: a mailbox that receives through Postilio showed as not configured on the dashboard
+  (**Administrator has not configured mailbox connection settings yet**), with a warning on **Fetching Emails**. It now
+  gets the incoming protocol **Postilio**: FreeScout counts it as connected, and `fetch-emails` skips it instead of
+  trying IMAP. Turning Postilio inbound off restores the protocol the mailbox had. A migration moves the mailboxes that
+  were turned on with 0.1.0.
+
 ## [0.1.0]
 
 First version, tested with FreeScout 1.8.250.
