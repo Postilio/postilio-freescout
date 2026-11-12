@@ -24,6 +24,9 @@ Each module works on its own and is switched on per mailbox. Use either or both.
    (`postilio_inbound_messages`).
 3. Open a mailbox's settings: the menu now has **Postilio sending** and **Postilio inbound**. Only admins see them.
 
+To update, replace the directories and run FreeScout's migrations (`php artisan migrate`, or deactivate and activate
+the module); 0.1.1 has one for the inbound module.
+
 The modules have no dependencies of their own; they use what FreeScout ships (Guzzle, SwiftMailer, its IMAP parser).
 
 ## Sending replies through Postilio (Postilio Dispatch - Send)
@@ -43,6 +46,10 @@ The key and secret are stored encrypted and never shown again.
 From then on every reply of the mailbox goes through Postilio, whatever the **Connection Settings** page says; that
 page stays as it is, so unticking the box falls back to it. System mail (notifications to agents) never goes through
 Postilio. Without a signing secret, replies are sent but FreeScout hears nothing about bounces.
+
+FreeScout counts the sending side as configured from what that page says: PHP mail and Sendmail always, SMTP once it
+has a server. Leave it on PHP mail (FreeScout's default) when Postilio sends everything. Whether the mailbox shows as
+connected on the dashboard also depends on receiving: through IMAP or POP3, or through Postilio Dispatch - Inbound.
 
 | Postilio event | In FreeScout |
 |---|---|
@@ -66,6 +73,12 @@ In Postilio (see its [Inbound mail](https://docs.postilio.eu/inbound) guide):
 4. Add a route for the address (for example `exact` `support`) with the action `webhook` and that endpoint.
 
 In FreeScout, on **Postilio inbound**: tick **Receive through Postilio**, paste the API key and the signing secret, save.
+
+Saving it turned on sets the mailbox's incoming protocol to **Postilio**, a protocol the module adds. FreeScout then shows
+the mailbox as connected (dashboard, mailbox menu, **Connection Settings › Fetching Emails** says *Active*), and its
+`fetch-emails` command, which only takes mailboxes on IMAP or POP3, leaves the mailbox alone: no IMAP connection to a
+server that is not there. Saving it turned off puts back the protocol the mailbox had (its IMAP or POP3 settings are
+kept), so fetching starts again if those are filled in.
 
 The mailbox's own address is best the address that receives the mail (`support@support.example.com`); if customers
 write to another address that forwards to Postilio, FreeScout still files the mail in this mailbox, because the webhook
@@ -120,12 +133,15 @@ the signature is what authenticates them.
   (`auth.dmarc`), but the module imports the raw message as it is.
 - **Postilio's `Message-ID` format is not part of its documented API yet.** Should it change, customer replies to a
   reply sent through the API thread by `References` and FreeScout's marker in the quoted text only.
+- **Nothing to save on Fetching Emails for a Postilio mailbox.** That page still has its Save button, and FreeScout
+  wants IMAP or POP3 settings there; switching back is done on the **Postilio inbound** page.
 - **One API key per mailbox and module.** Several mailboxes can use the same key.
 
 ## Development
 
 ```sh
 tools/test.sh            # clones FreeScout (branch dist), starts MariaDB, runs the module tests; all in Docker
+DOCKER_LABEL=team=me tools/test.sh   # the same, with a label on the containers and network it starts
 ```
 
 The tests are FreeScout feature tests: they send a real reply with FreeScout's own job, post signed webhooks and import

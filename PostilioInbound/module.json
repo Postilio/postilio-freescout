@@ -2,7 +2,7 @@
     "name": "Postilio Dispatch - Inbound",
     "alias": "postilioinbound",
     "description": "Receive mail through Postilio inbound: its webhook creates conversations and replies, as fetched by IMAP.",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "detailsUrl": "https://github.com/Postilio/postilio-freescout",
     "author": "Postilio",
     "authorUrl": "https://postilio.eu",

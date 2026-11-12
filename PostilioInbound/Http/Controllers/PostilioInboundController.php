@@ -70,6 +70,13 @@ class PostilioInboundController extends Controller
                 $settings[$field] = \Helper::encrypt($value);
             }
         }
+        // Receiving through Postilio replaces fetching; turned off, the mailbox goes back to the protocol it had.
+        if ($enabled && (int) $mailbox->in_protocol !== Provider::IN_PROTOCOL) {
+            $settings['in_protocol_before'] = (int) $mailbox->in_protocol;
+            $mailbox->in_protocol = Provider::IN_PROTOCOL;
+        } elseif (!$enabled && (int) $mailbox->in_protocol === Provider::IN_PROTOCOL) {
+            $mailbox->in_protocol = $settings['in_protocol_before'] ?? Mailbox::IN_PROTOCOL_IMAP;
+        }
         $mailbox->setMetaParam(Provider::META, $settings, true);
         \Session::flash('flash_success_floating', __('Settings saved'));
 
