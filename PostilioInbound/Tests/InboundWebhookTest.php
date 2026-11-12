@@ -150,6 +150,16 @@ class InboundWebhookTest extends TestCase
         $this->assertCount(1, $this->conversations());
     }
 
+    public function testKeyRefused_AnswersRetryLater_AndTheFetchErrorNamesPostiliosReason()
+    {
+        $this->postilio([new Response(403, ['Content-Type' => 'application/json'], '{"error":"insufficient_scope"}')]);
+
+        $this->deliver($this->event())->assertStatus(503);
+
+        $error = \App\ActivityLog::where('log_name', \App\ActivityLog::NAME_EMAILS_FETCHING)->orderBy('id', 'desc')->first()->properties['error'];
+        $this->assertStringContainsString('403 insufficient_scope', $error);
+    }
+
     public function testContentGone_IsTakenAndNeverAskedForAgain()
     {
         $this->postilio([new Response(410, [], '{"error":"inbound_content_deleted"}')]);

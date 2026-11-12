@@ -15,6 +15,9 @@ All notable changes to this project are documented here. The format follows
   gets the incoming protocol **Postilio**: FreeScout counts it as connected, and `fetch-emails` skips it instead of
   trying IMAP. Turning Postilio inbound off restores the protocol the mailbox had. A migration moves the mailboxes that
   were turned on with 0.1.0.
+- Postilio Dispatch - Inbound: when Postilio refuses to hand over a message, the fetch error now names its reason
+  (`Postilio answered 403 insufficient_scope …`), so a key without `inbound:read` or used from a network it is not
+  allowed from is found at once.
 
 ## [0.1.0]
 

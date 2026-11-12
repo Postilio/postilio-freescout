@@ -136,7 +136,11 @@ class PostilioInboundController extends Controller
             return response('', 204);
         }
         if ($response->getStatusCode() !== 200) {
-            return $this->release($id, 503, 'Postilio answered '.$response->getStatusCode().' for the raw message '.$id);
+            // Postilio's error code (insufficient_scope, client_ip_not_allowed, ...) says what to fix.
+            $code = json_decode((string) $response->getBody(), true)['error'] ?? '';
+            $code = is_string($code) && preg_match('/^[a-z0-9_]{1,64}$/', $code) ? ' '.$code : '';
+
+            return $this->release($id, 503, 'Postilio answered '.$response->getStatusCode().$code.' for the raw message '.$id);
         }
 
         $importer = new Importer();
