@@ -1,0 +1,2 @@
+# Mail fixtures keep their CRLF line ends, as mail has them.
+*.eml -text
