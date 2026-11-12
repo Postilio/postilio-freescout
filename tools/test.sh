@@ -4,7 +4,7 @@
 #   tools/test.sh [freescout-ref]      (default: dist, the branch FreeScout releases with its vendor directory)
 #
 # Leaves nothing behind but a work directory under ${WORK:-/tmp}/postilio-freescout-test.* (printed at the end),
-# and stops and removes the containers and network it started.
+# and stops and removes the containers and network it started. DOCKER_LABEL=key=value labels them.
 set -euo pipefail
 
 repo=$(cd "$(dirname "$0")/.." && pwd)
@@ -12,6 +12,7 @@ ref=${1:-dist}
 work=$(mktemp -d "${WORK:-/tmp}/postilio-freescout-test.XXXXXX")
 name=pfs-test-$$
 uid="$(id -u):$(id -g)"
+label=(${DOCKER_LABEL:+--label "$DOCKER_LABEL"})
 
 cleanup() {
   docker rm -f "$name-db" >/dev/null 2>&1 || true
@@ -25,6 +26,8 @@ docker build -q -t postilio-freescout-test - >/dev/null <<'EOF'
 FROM php:8.2-cli
 ADD --chmod=0755 https://github.com/mlocati/docker-php-extension-installer/releases/latest/download/install-php-extensions /usr/local/bin/
 RUN install-php-extensions pdo_mysql mbstring gd zip intl imap @composer
+# FreeScout looks for its queue worker and fetch-emails with ps.
+RUN apt-get update -q && apt-get install -qy --no-install-recommends procps && rm -rf /var/lib/apt/lists/*
 EOF
 
 # FreeScout's vendor is committed without its dev packages: PHPUnit as a phar, Faker (its factories need it) apart.
@@ -44,13 +47,13 @@ $loader->addPsr4('Faker\\', '/tools/vendor/fzaninotto/faker/src/Faker');
 EOF
 printf 'DB_CONNECTION=testing\nDB_TEST_HOST=%s-db\nAPP_KEY=base64:ZnJlZXNjb3V0LXBocHVuaXQtdGVzdC1rZXktMDAwMDE=\n' "$name" > .env
 
-docker network create "$name" >/dev/null
-docker run -d --name "$name-db" --network "$name" -e MARIADB_ROOT_PASSWORD=root -e MARIADB_DATABASE=freescout-test \
+docker network create "${label[@]}" "$name" >/dev/null
+docker run -d "${label[@]}" --name "$name-db" --network "$name" -e MARIADB_ROOT_PASSWORD=root -e MARIADB_DATABASE=freescout-test \
   -e MARIADB_USER=freescout-test -e MARIADB_PASSWORD=freescout-test mariadb:11 >/dev/null
 until docker exec "$name-db" mariadb -ufreescout-test -pfreescout-test -e 'select 1' freescout-test >/dev/null 2>&1; do sleep 1; done
 
 run() {
-  docker run --rm --network "$name" -u "$uid" -e HOME=/tmp -v "$work/freescout:/app" -v "$repo:/repo:ro" \
+  docker run --rm "${label[@]}" --network "$name" -u "$uid" -e HOME=/tmp -v "$work/freescout:/app" -v "$repo:/repo:ro" \
     -v "$work/tools:/tools:ro" -v "$work/phpunit.phar:/phpunit.phar:ro" -w /app postilio-freescout-test "$@"
 }
 run php artisan migrate --database=testing --force >/dev/null
