@@ -2,13 +2,13 @@
 
 Two [FreeScout](https://freescout.net) modules for [Postilio](https://postilio.eu), European transactional email:
 
-- **PostilioSend** sends the replies of a mailbox through the Postilio API (`POST /v1/emails`) instead of SMTP, with
-  attachments, inline images and the `In-Reply-To`/`References` headers, so threads stay intact. Postilio reports
-  back by webhook, and a reply that bounced shows as **Message not sent to customer** in the conversation, with
-  Postilio's reason.
-- **PostilioInbound** takes mail that Postilio receives for you (inbound mail) by webhook, and makes it a conversation,
-  or a reply in its conversation, exactly as FreeScout does with mail it fetches by IMAP: customer, threading on
-  `Message-ID`/`In-Reply-To`/`References`, attachments. No polling.
+- **Postilio Dispatch - Send** (directory `PostilioSend`) sends the replies of a mailbox through the Postilio API (`POST
+  /v1/emails`) instead of SMTP, with attachments, inline images and the `In-Reply-To`/`References` headers, so threads
+  stay intact. Postilio reports back by webhook, and a reply that bounced shows as **Message not sent to customer** in
+  the conversation, with Postilio's reason.
+- **Postilio Dispatch - Inbound** (directory `PostilioInbound`) takes mail that Postilio receives for you (inbound mail)
+  by webhook, and makes it a conversation, or a reply in its conversation, exactly as FreeScout does with mail it
+  fetches by IMAP: customer, threading on `Message-ID`/`In-Reply-To`/`References`, attachments. No polling.
 
 Each module works on its own and is switched on per mailbox. Use either or both.
 
@@ -19,13 +19,14 @@ Each module works on its own and is switched on per mailbox. Use either or both.
 
 1. Copy the `PostilioSend` and/or `PostilioInbound` directory into FreeScout's `Modules` directory, keeping the names:
    `Modules/PostilioSend`, `Modules/PostilioInbound`.
-2. In FreeScout, open **Manage › Modules** and activate the module. Activating PostilioInbound creates its table
+2. In FreeScout, open **Manage › Modules** and activate **Postilio Dispatch - Send** and/or **Postilio Dispatch -
+   Inbound**. Activating the inbound module creates its table
    (`postilio_inbound_messages`).
 3. Open a mailbox's settings: the menu now has **Postilio sending** and **Postilio inbound**. Only admins see them.
 
 The modules have no dependencies of their own; they use what FreeScout ships (Guzzle, SwiftMailer, its IMAP parser).
 
-## Sending replies through Postilio (PostilioSend)
+## Sending replies through Postilio (Postilio Dispatch - Send)
 
 In Postilio:
 
@@ -53,7 +54,7 @@ A refused message (say `422 unverified_sender_domain`) or an unreachable API fai
 shows as not sent, with the error, and FreeScout retries it. Each send carries an `Idempotency-Key`, so a retry is
 never delivered twice.
 
-## Receiving mail through Postilio (PostilioInbound)
+## Receiving mail through Postilio (Postilio Dispatch - Inbound)
 
 In Postilio (see its [Inbound mail](https://docs.postilio.eu/inbound) guide):
 
@@ -91,15 +92,15 @@ claim that is older than five minutes (an import that died halfway) is taken ove
 
 ## How it works
 
-FreeScout has no hook to add a sending method to the **Connection Settings** page. PostilioSend listens to the moment
+FreeScout has no hook to add a sending method to the **Connection Settings** page. The send module listens to the moment
 FreeScout configures its mailer for a mailbox (`mail.reapply_mail_config`) and puts a SwiftMailer transport for the
 Postilio API in, when that mailbox has Postilio on.
 
-Postilio writes its own `Message-ID` (`<{email id without dashes}@{sender domain}>`). PostilioSend keeps that id on the
+Postilio writes its own `Message-ID` (`<{email id without dashes}@{sender domain}>`). The send module keeps that id on the
 reply's thread, so the customer's answer, which refers to it, lands in the right conversation through FreeScout's own
 threading, and the status webhook finds the reply by its email id.
 
-PostilioInbound downloads the message as it arrived (`GET /v1/inbound/messages/{id}/raw`) and hands it to the same code
+The inbound module downloads the message as it arrived (`GET /v1/inbound/messages/{id}/raw`) and hands it to the same code
 FreeScout's `fetch-emails` command uses for a message from IMAP.
 
 Webhooks are checked as Postilio documents them ([Standard Webhooks](https://www.standardwebhooks.com/)): HMAC-SHA256

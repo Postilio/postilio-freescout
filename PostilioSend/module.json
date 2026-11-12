@@ -1,5 +1,5 @@
 {
-    "name": "PostilioSend",
+    "name": "Postilio Dispatch - Send",
     "alias": "postiliosend",
     "description": "Send replies through the Postilio API, per mailbox, and show when a reply bounced.",
     "version": "0.1.0",
