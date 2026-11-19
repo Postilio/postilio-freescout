@@ -92,12 +92,18 @@ down or slow.
 
 | Answer | When |
 |---|---|
-| `204` | imported; or a repeat of a message that was imported already (no second conversation); or Postilio deleted the content before it could be fetched (`410`, logged: retrying never helps); or an event other than `inbound.received.v1` |
+| `204` | imported; or a repeat of a message that was imported already (no second conversation); or Postilio deleted the content before it could be fetched (`410`, logged: retrying never helps); or FreeScout refused the message for good, as it does when fetching (an answer to an agent notification it cannot verify, an auto-reply to one; logged, and a replay from Postilio tries it again); or an event other than `inbound.received.v1` |
 | `401` | the signature does not match, or its timestamp is more than five minutes off |
 | `404` | the mailbox does not exist, or Postilio inbound is off for it |
 | `400` | the body is not a Postilio event, or the `inboundId` is not an id |
 | `503` | Postilio could not be reached for the message, or the same message is being imported by another delivery right now |
-| `500` | FreeScout could not import the message (the reason is in **Manage › Logs › Fetch errors**) |
+| `500` | FreeScout could not import the message for another reason (the reason is in **Manage › Logs › Fetch errors**) |
+
+A message without a `From` header (a bounce with an empty envelope sender often has none) gets one before it is
+imported, since FreeScout refuses mail without a sender: the envelope sender from the event, else the `Return-Path`, else
+`mailer-daemon@` the host that sent it (its HELO name, or the recipient's domain), named **Unknown sender**. The message
+then carries `X-Postilio-From-Synthesized: 1`, and a `From` that had no usable address is kept as
+`X-Postilio-Original-From`.
 
 Each message is claimed by its `inboundId` before it is imported, so two deliveries at once never import it twice. A
 claim that is older than five minutes (an import that died halfway) is taken over by the next delivery. FreeScout's own

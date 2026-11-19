@@ -6,6 +6,18 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.2]
+
+### Fixed
+
+- Postilio Dispatch - Inbound: a message without a `From` header, such as a bounce sent with an empty envelope sender,
+  was refused (**From is empty**) and Postilio delivered it again for days. It now gets a sender: the envelope sender,
+  else its `Return-Path`, else `mailer-daemon@` the sending host, named **Unknown sender**. Such a message carries
+  `X-Postilio-From-Synthesized: 1`; a `From` without a usable address is kept as `X-Postilio-Original-From`.
+- Postilio Dispatch - Inbound: a message FreeScout refuses for good, as it does when fetching by IMAP (an answer to an
+  agent notification it cannot verify, an auto-reply to one, a reply from an inactive agent), is answered with `204`
+  and logged, so Postilio stops retrying it. Replaying the delivery from Postilio tries it again.
+
 ## [0.1.1]
 
 ### Fixed
