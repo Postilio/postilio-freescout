@@ -105,7 +105,9 @@ class InboundWebhookTest extends TestCase
     public function testReply_ToAReplySentThroughPostilio_LandsInThatConversation()
     {
         $user = User::first();
-        $conversation = factory(Conversation::class)->create(['mailbox_id' => $this->mailbox->id, 'created_by_user_id' => $user->id]);
+        $conversation = factory(Conversation::class)->create([
+            'mailbox_id' => $this->mailbox->id, 'created_by_user_id' => $user->id, 'customer_email' => 'marie@example.org',
+        ]);
         // The Message-ID Postilio gave our reply, as PostilioSend keeps it on the thread.
         factory(Thread::class)->create([
             'conversation_id'    => $conversation->id,
