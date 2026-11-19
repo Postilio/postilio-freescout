@@ -134,7 +134,6 @@ class InboundWebhookTest extends TestCase
             'no From, the envelope sender'         => ['', ['mailFrom' => 'bounces@relay.example.net'], 'bounces@relay.example.net'],
             'no From, empty envelope, Return-Path' => ["Return-Path: <rp@relay.example.net>\r\n", ['mailFrom' => ''], 'rp@relay.example.net'],
             'no From, HELO not a host name'        => ['', ['mailFrom' => '', 'helo' => '[203.0.113.9]', 'recipients' => ['postmaster@pstlmta.net']], 'mailer-daemon@pstlmta.net'],
-            'a From without an address'            => ["From: undisclosed sender\r\n", ['mailFrom' => 'bounces@relay.example.net'], 'bounces@relay.example.net'],
         ];
     }
 
@@ -151,6 +150,19 @@ class InboundWebhookTest extends TestCase
         $this->assertCount(1, $conversations);
         $this->assertSame($sender, $conversations[0]->customer_email);
         $this->assertStringContainsString('X-Postilio-From-Synthesized: 1', $conversations[0]->threads()->first()->headers);
+    }
+
+    public function testFrom_WithoutAnAddress_IsReplaced_AndKeptAsTheOriginal()
+    {
+        $this->postilio([$this->message("From: undisclosed sender\r\n")]);
+
+        $this->deliver($this->event(self::INBOUND_ID, 'inbound.received.v1', ['mailFrom' => 'bounces@relay.example.net']))->assertStatus(204);
+
+        $conversation = $this->conversations()[0];
+        $this->assertSame('bounces@relay.example.net', $conversation->customer_email);
+        $headers = $conversation->threads()->first()->headers;
+        $this->assertStringContainsString('X-Postilio-Original-From: undisclosed sender', $headers);
+        $this->assertSame(1, preg_match_all('/^From:/mi', $headers));
     }
 
     public function testReply_ToAReplySentThroughPostilio_LandsInThatConversation()
