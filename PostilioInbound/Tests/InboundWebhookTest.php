@@ -52,13 +52,24 @@ class InboundWebhookTest extends TestCase
         return new Response(200, ['Content-Type' => 'message/rfc822'], file_get_contents(__DIR__.'/fixtures/'.$fixture));
     }
 
-    private function event($inboundId = self::INBOUND_ID, $type = 'inbound.received.v1')
+    private function event($inboundId = self::INBOUND_ID, $type = 'inbound.received.v1', array $envelope = [])
     {
         return json_encode(['type' => $type, 'timestamp' => '2026-10-21T13:52:50.102+00:00', 'data' => [
             'inboundId' => $inboundId,
+            'envelope'  => $envelope + [
+                'mailFrom' => 'marie@example.org', 'recipients' => ['support@inbound.northwind.test'],
+                'remoteIp' => '209.85.220.41', 'helo' => 'mail-sor-f41.google.com', 'tls' => 'TLSv1.3',
+            ],
             'from'      => ['name' => 'Marie Curie', 'address' => 'marie@example.org'],
             'subject'   => 'The parcel arrived damaged',
         ]]);
+    }
+
+    private function message($headers)
+    {
+        return new Response(200, ['Content-Type' => 'message/rfc822'], $headers
+            ."To: postmaster@pstlmta.net\r\nSubject: Undelivered Mail Returned to Sender\r\n"
+            ."Message-ID: <dsn-1@mail1.siteindex.pro>\r\n\r\nThe message could not be delivered.\r\n");
     }
 
     private function deliver($body, $secret = self::SECRET, $mailboxId = null)
@@ -100,12 +111,66 @@ class InboundWebhookTest extends TestCase
         $this->assertSame('CAF4x9-new@mail.example.org', $thread->message_id);
         $this->assertStringContainsString('the parcel arrived damaged', $thread->body);
         $this->assertSame(['photo.jpg'], $thread->attachments->pluck('file_name')->all());
+        $this->assertStringNotContainsString('X-Postilio-From-Synthesized', $thread->headers);
+    }
+
+    public function testBounce_WithoutAFromToAnEmptyEnvelopeSender_IsImportedFromASyntheticSender()
+    {
+        $this->postilio([$this->message("Return-Path: <>\r\n")]);
+
+        $this->deliver($this->event(self::INBOUND_ID, 'inbound.received.v1', ['mailFrom' => '', 'helo' => 'mail1.siteindex.pro']))
+            ->assertStatus(204);
+
+        $conversations = $this->conversations();
+        $this->assertCount(1, $conversations);
+        $this->assertSame('mailer-daemon@mail1.siteindex.pro', $conversations[0]->customer_email);
+        $this->assertSame('Unknown sender', $conversations[0]->customer->getFullName());
+        $this->assertStringContainsString('X-Postilio-From-Synthesized: 1', $conversations[0]->threads()->first()->headers);
+    }
+
+    public static function senders()
+    {
+        return [
+            'no From, the envelope sender'         => ['', ['mailFrom' => 'bounces@relay.example.net'], 'bounces@relay.example.net'],
+            'no From, empty envelope, Return-Path' => ["Return-Path: <rp@relay.example.net>\r\n", ['mailFrom' => ''], 'rp@relay.example.net'],
+            'no From, HELO not a host name'        => ['', ['mailFrom' => '', 'helo' => '[203.0.113.9]', 'recipients' => ['postmaster@pstlmta.net']], 'mailer-daemon@pstlmta.net'],
+        ];
+    }
+
+    /**
+     * @dataProvider senders
+     */
+    public function testMessage_WithoutAUsableFrom_GetsTheSenderPostilioKnows($headers, array $envelope, $sender)
+    {
+        $this->postilio([$this->message($headers)]);
+
+        $this->deliver($this->event(self::INBOUND_ID, 'inbound.received.v1', $envelope))->assertStatus(204);
+
+        $conversations = $this->conversations();
+        $this->assertCount(1, $conversations);
+        $this->assertSame($sender, $conversations[0]->customer_email);
+        $this->assertStringContainsString('X-Postilio-From-Synthesized: 1', $conversations[0]->threads()->first()->headers);
+    }
+
+    public function testFrom_WithoutAnAddress_IsReplaced_AndKeptAsTheOriginal()
+    {
+        $this->postilio([$this->message("From: undisclosed sender\r\n")]);
+
+        $this->deliver($this->event(self::INBOUND_ID, 'inbound.received.v1', ['mailFrom' => 'bounces@relay.example.net']))->assertStatus(204);
+
+        $conversation = $this->conversations()[0];
+        $this->assertSame('bounces@relay.example.net', $conversation->customer_email);
+        $headers = $conversation->threads()->first()->headers;
+        $this->assertStringContainsString('X-Postilio-Original-From: undisclosed sender', $headers);
+        $this->assertSame(1, preg_match_all('/^From:/mi', $headers));
     }
 
     public function testReply_ToAReplySentThroughPostilio_LandsInThatConversation()
     {
         $user = User::first();
-        $conversation = factory(Conversation::class)->create(['mailbox_id' => $this->mailbox->id, 'created_by_user_id' => $user->id]);
+        $conversation = factory(Conversation::class)->create([
+            'mailbox_id' => $this->mailbox->id, 'created_by_user_id' => $user->id, 'customer_email' => 'marie@example.org',
+        ]);
         // The Message-ID Postilio gave our reply, as PostilioSend keeps it on the thread.
         factory(Thread::class)->create([
             'conversation_id'    => $conversation->id,
@@ -187,15 +252,35 @@ class InboundWebhookTest extends TestCase
         $this->assertCount(1, $this->conversations());
     }
 
-    public function testMessage_FreeScoutCannotImport_AnswersAnErrorSoPostilioKeepsIt()
+    public function testImportThatFails_AnswersAnErrorSoPostilioKeepsIt()
     {
-        $this->postilio([new Response(200, [], "Subject: no sender\r\n\r\nbody\r\n"), $this->raw('new.eml')]);
+        $this->postilio([$this->raw('new.eml'), $this->raw('new.eml')]);
+        \Eventy::addFilter('fetch_emails.data_to_save', function () {
+            throw new \RuntimeException('Deadlock found when trying to get lock');
+        });
 
         $this->deliver($this->event())->assertStatus(500);
 
         $this->assertCount(0, $this->conversations());
         // Released: a redelivery is tried again.
+        \Eventy::removeAllFilters('fetch_emails.data_to_save');
         $this->deliver($this->event())->assertStatus(204);
+        $this->assertCount(1, $this->conversations());
+    }
+
+    public function testMessage_FreeScoutRefuses_IsTakenSoPostilioStopsRetrying_ButAReplayIsTriedAgain()
+    {
+        // An answer to an agent notification whose Message-ID hash does not check out: FreeScout refuses it for good.
+        $refused = new Response(200, [], "From: Marie Curie <marie@example.org>\r\nTo: support@inbound.northwind.test\r\n"
+            ."Subject: Re: notification\r\nMessage-ID: <answer-1@mail.example.org>\r\n"
+            ."In-Reply-To: <notify-1-1-0000000000000000@inbound.northwind.test>\r\n\r\nThanks\r\n");
+        $this->postilio([$refused, $refused]);
+
+        $this->deliver($this->event())->assertStatus(204);
+        $this->deliver($this->event())->assertStatus(204);
+
+        $this->assertCount(0, $this->conversations());
+        $this->assertCount(2, $this->history);
     }
 
     public function testTestEvent_IsTakenAndIgnored()

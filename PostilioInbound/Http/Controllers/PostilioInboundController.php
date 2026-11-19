@@ -140,8 +140,11 @@ class PostilioInboundController extends Controller
         }
 
         $importer = new Importer();
-        if (!$importer->import((string) $response->getBody(), $mailbox)) {
-            return $this->release($id, 500, 'Inbound message '.$id.' was not imported: '.implode('; ', $importer->errors));
+        $envelope = is_array($event['data']['envelope'] ?? null) ? $event['data']['envelope'] : [];
+        if (!$importer->import((string) $response->getBody(), $mailbox, $envelope)) {
+            $error = 'Inbound message '.$id.' was not imported: '.implode('; ', $importer->errors);
+            // A refusal is final: 2xx stops Postilio's retries, and releasing the claim lets a replay try it again.
+            return $this->release($id, $importer->refused() ? 204 : 500, $error);
         }
         \DB::table(self::TABLE)->where('inbound_id', $id)->update(['status' => 'done', 'updated_at' => now()]);
 
